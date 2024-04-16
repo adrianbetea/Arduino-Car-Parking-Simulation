@@ -1,0 +1,291 @@
+#include <Adafruit_NeoPixel.h>
+#include <math.h>
+
+#define POTENTIOMETER_PIN A5
+#define MAX_POT_VALUE 1023
+#define ENGINE_OFF_VAL MAX_POT_VALUE * 0.3
+#define ACCESSORY_MODE_VAL MAX_POT_VALUE * 0.6
+
+#define NOTE_C4 261
+
+// poetentiometer
+int potentiometer_val;
+
+// car status boolean
+bool engine_off_status = false;
+bool accessory_mode_status = false;
+bool engine_on_status = false;
+
+// RGB LED PINS
+const int PIN_RED = 13;
+const int PIN_BLUE = 12;
+const int PIN_GREEN = 11;
+
+int red_val = 0;
+int green_val = 0;
+int blue_val = 0;
+
+// PARKING STATUS LED PIN
+const int PIN_PARKING_LED = 6;
+int parking_led_status;
+
+// PARKING BUTTON 
+const int PARKING_BUTTON = 3;
+int button_state;
+int previous_button_state;
+
+// distance
+float distance_cm;
+const int max_distance = 335;
+const float distance_level = 41.62;
+
+// BUZZER
+unsigned long previous_millis = 0UL;
+unsigned long interval_yellow = 1000;
+unsigned long interval_orange = 600;
+unsigned long interval_red = 200;
+
+// NEOPIXEL STRIP
+const int PIXELS_PIN = 2;
+Adafruit_NeoPixel pixels = Adafruit_NeoPixel(8, PIXELS_PIN, NEO_GRB + NEO_KHZ800);
+const int strip_red_limit = 8;
+const int strip_orange_limit = 6;
+const int strip_yellow_limit = 4;
+const int strip_green_limit = 2;
+
+// Write values to LED pins
+void rgb_engine_color()
+{
+  analogWrite(PIN_RED, red_val);    
+  analogWrite(PIN_BLUE, blue_val); 
+  analogWrite(PIN_GREEN, green_val);
+}
+
+
+// setup for the time when engine is off
+void engine_off() 
+{  
+  // changes the rgb led color
+  green_val = 0;
+  blue_val = 0;
+  red_val = 255;
+  
+  // if engine is off then parking led - off
+  if(engine_off_status == false) {
+    digitalWrite(PIN_PARKING_LED, LOW);
+    parking_led_status = LOW;
+    engine_off_status = true;
+    accessory_mode_status = false;
+    engine_on_status = false;
+  }
+  
+  
+  rgb_engine_color();
+}
+
+// // setup for the time when car is on accessory mode
+void accessory_mode() 
+{  
+  // changes the rgb led color
+  blue_val = 0;
+  green_val = 255;
+  red_val = 255;
+  
+  
+  if(accessory_mode_status == false) {
+    // if car is on accessory mode after engine off 
+  	// then turn on the parking led status
+    // parking led status - on -> parking mode off
+    if(engine_off_status == true) {
+      digitalWrite(PIN_PARKING_LED, HIGH);
+      parking_led_status = HIGH;
+    }
+    // if parking mode is on then keep the led off
+    // parking led status - off -> parking mode on
+    if(parking_led_status == LOW) {
+      digitalWrite(PIN_PARKING_LED, LOW);
+    }
+    accessory_mode_status = true;
+    engine_off_status = false;
+    engine_on_status = false;
+  }
+  
+  rgb_engine_color();
+}
+
+// setup for the time when engine is on
+void engine_on() 
+{  
+  // changes the rgb led color
+  green_val = 255;
+  red_val = 0;
+  blue_val = 0;
+  
+  
+  if(engine_on_status == false) {
+    if(parking_led_status == HIGH) {
+      digitalWrite(PIN_PARKING_LED, HIGH);
+    }
+    else {
+      digitalWrite(PIN_PARKING_LED, LOW);
+    }
+    engine_on_status = true;
+    accessory_mode_status = false;
+    engine_off_status = false;
+  }
+  
+  
+  rgb_engine_color();
+}
+
+void engine_status()
+{
+  // if potentiometer val between 0-30% engine is off
+  //					  between 30-60% accessory mode
+  //					  between 60-100% engine is off
+  
+  potentiometer_val = analogRead(POTENTIOMETER_PIN);
+  if(potentiometer_val < ENGINE_OFF_VAL) {  	
+    engine_off();
+  }
+  if(potentiometer_val >= ENGINE_OFF_VAL && potentiometer_val < ACCESSORY_MODE_VAL) {
+  	accessory_mode();
+  }
+  if(potentiometer_val >= ACCESSORY_MODE_VAL) {
+  	engine_on();
+  } 
+}
+
+void parking_status() 
+{
+  button_state = digitalRead(PARKING_BUTTON);
+  // if accessory mode or engine is on
+  if(potentiometer_val >= ENGINE_OFF_VAL) {
+    if(button_state != previous_button_state) {
+      previous_button_state = button_state;
+      // if button is pressed
+      if(button_state == HIGH) {
+        // if parking led is on then turn it off
+        if(parking_led_status == HIGH) {
+          parking_led_status = LOW;
+        }
+        // else turn it on
+        else {
+          parking_led_status = HIGH;
+        }
+        digitalWrite(PIN_PARKING_LED, parking_led_status);
+      }
+    }
+  }
+}
+
+long readUltrasonicDistance(int triggerPin, int echoPin) 
+{
+  pinMode(triggerPin, OUTPUT); // clear the trigger
+  digitalWrite(triggerPin, LOW);
+  delayMicroseconds(2);
+  
+  digitalWrite(triggerPin, HIGH);
+  delayMicroseconds(10);
+  
+  digitalWrite(triggerPin, LOW);
+  pinMode(echoPin, INPUT);
+  
+  return pulseIn(echoPin, HIGH);  
+}
+
+void alarm(unsigned int interval) 
+{
+  unsigned long current_millis = millis();
+  Serial.println(current_millis);
+  if(current_millis - previous_millis > 2 * interval) {
+    tone(4, NOTE_C4, interval);
+    previous_millis = current_millis;
+  }
+  
+  
+}
+
+void color_strip_on(int level){
+	for (int i=0; i < level; i++) {
+      // pixels.Color takes RGB values, from 0,0,0 up to 255,255,255
+      if(i < strip_green_limit){
+      	pixels.setPixelColor(i, pixels.Color(0, 255, 0));
+      }else if(i >= strip_green_limit && i < strip_yellow_limit){
+      	pixels.setPixelColor(i, pixels.Color(255, 255, 0));
+        alarm(interval_yellow);
+      }
+      else if(i >= strip_yellow_limit && i < strip_orange_limit){
+      	pixels.setPixelColor(i, pixels.Color(255, 165, 100));
+        alarm(interval_orange);
+      }
+      else if(i >= strip_orange_limit){
+      	pixels.setPixelColor(i, pixels.Color(255, 0, 0));
+        alarm(interval_red);
+      }
+      
+      
+      // This sends the updated pixel color to the hardware.
+      pixels.show();
+
+      // Delay for a period of time (in milliseconds).
+      delay(10);
+       }
+}
+void color_strip_off(int level){
+	for (int i=7; i >= level; i--) {
+      // pixels.Color takes RGB values, from 0,0,0 up to 255,255,255
+      pixels.setPixelColor(i, pixels.Color(0, 0, 0));
+
+      // This sends the updated pixel color to the hardware.
+      pixels.show();
+
+      // Delay for a period of time (in milliseconds).
+      delay(10);
+       }
+}
+
+void setup()
+{
+  // RGB LED setup
+  pinMode(PIN_RED, OUTPUT);
+  pinMode(PIN_BLUE, OUTPUT);
+  pinMode(PIN_GREEN, OUTPUT);
+  
+  // PARKING STATUS LED setup
+  pinMode(PIN_PARKING_LED, OUTPUT);
+  
+  // PARKING BUTTON
+  pinMode(PARKING_BUTTON, INPUT_PULLUP);
+  previous_button_state = digitalRead(PARKING_BUTTON);
+  
+  // BUZZER
+  pinMode(4, OUTPUT);
+  
+  // PIXEL STRIP
+  pixels.begin();
+  
+  Serial.begin(9600);
+}
+
+
+void loop()
+{
+  delay(1);
+  engine_status();
+  parking_status();
+  
+  if(potentiometer_val > ENGINE_OFF_VAL) {
+    distance_cm = 0.01723 * readUltrasonicDistance(7, 7);
+  }
+  
+  if(parking_led_status == LOW && potentiometer_val > ENGINE_OFF_VAL){
+    Serial.println(parking_led_status);
+    color_strip_on(round((max_distance-distance_cm)/distance_level));
+  	color_strip_off(round((max_distance-distance_cm)/distance_level));
+  }
+  if(parking_led_status == HIGH || potentiometer_val <= ENGINE_OFF_VAL)
+     color_strip_off(0);
+  
+  //Serial.println(distance_cm);
+}

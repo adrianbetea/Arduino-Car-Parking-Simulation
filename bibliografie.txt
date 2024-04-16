@@ -1,0 +1,23 @@
+Arduino UNO R3 documentatie 
+https://docs.arduino.cc/learn/programming/eeprom-guide
+
+LED RGB
+https://howtomechatronics.com/tutorials/arduino/how-to-use-a-rgb-led-with-arduino/
+
+RESISTOR
+https://learn.adafruit.com/adafruit-arduino-lesson-2-leds/resistors
+
+POTENTIOMETRU
+https://docs.arduino.cc/learn/electronics/potentiometer-basics
+
+Pushbutton
+https://docs.arduino.cc/built-in-examples/digital/Button
+
+Buzzer
+https://docs.arduino.cc/built-in-examples/digital/toneMelody
+
+ULTRASONIC SENSOR
+https://howtomechatronics.com/tutorials/arduino/ultrasonic-sensor-hc-sr04/
+
+NEOPIXEL STRIP
+https://arduinogetstarted.com/tutorials/arduino-neopixel-led-strip
